@@ -1,9 +1,10 @@
-from flask import Flask, jsonify, request
-from util import LettersOnlyConverter, EndpointNamingError
+import sys
+sys.path.append("./")
 import json
-
-app = Flask(__name__)
-app.url_map.converters['lettersOnly'] = LettersOnlyConverter
+from flask import jsonify, request
+from util import EndpointNamingError
+from datetime import datetime
+from hello_world import app
 
 @app.route('/hello/<lettersOnly:username>', methods=['PUT'])
 def hello_put(username):
@@ -13,11 +14,18 @@ def hello_put(username):
 
     try:
         data = json.loads(request.data)
+        birth_date_raw = data["dateOfBirth"]
+        birth_date = datetime.strptime(birth_date_raw, "%Y-%m-%d")
 
-    except json.decoder.JSONDecodeError:
+        if birth_date.date() >= datetime.today().date():
+            return "Invalid date provided", 500
+
+    except (json.decoder.JSONDecodeError, KeyError):
         return "Invalid JSON provided", 500
+    except ValueError:
+        return "Invalid date provided", 500
 
-    return (data)
+    return "No Content", 204
 
 @app.route('/hello/<lettersOnly:username>', methods=['GET'])
 def hello_get(username):
@@ -28,7 +36,8 @@ def hello_get(username):
 def handle_naming_errors(e):
     """ Custom error handler for lettersOnly convertor exceptions """
     response = {
-        "error": e.description
+        "error": e.description,
+        "code": e.code
     }
     return jsonify(response), e.code
 
