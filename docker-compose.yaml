@@ -1,15 +1,30 @@
 services:
   postgres:
     image: postgres:12-alpine
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: sa
-      POSTGRES_PASSWORD: ChangeME!
-      POSTGRES_DB: hello_world
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: ${PGDATABASE}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5433:5432"
+      - "${PGPORT}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data/pgdata
+    networks:
+      - hello-world
+
+  hello_world:
+    depends_on:
+      - postgres
+    build: .
+    env_file:
+      - .env
+    environment:
+      PGHOST: postgres
+    ports:
+      - "5000:5000"
     networks:
       - hello-world
 

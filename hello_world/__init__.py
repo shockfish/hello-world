@@ -1,13 +1,13 @@
 from flask import Flask
-from util import LettersOnlyConverter
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from hello_world import util
 import os
 
 app = Flask(__name__)
 
 # Map custom url converter to the list of available converters
-app.url_map.converters['lettersOnly'] = LettersOnlyConverter
+app.url_map.converters['lettersOnly'] = util.LettersOnlyConverter
 
 """ Define DATABASE URI using postgres provider
 Following environment variables should be exported:
