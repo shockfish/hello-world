@@ -1,2 +1,5 @@
 venv/
 .idea
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate*
