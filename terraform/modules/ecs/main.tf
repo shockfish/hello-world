@@ -14,7 +14,7 @@ data "aws_iam_policy_document" "ecs_execution_role_tp" {
 
 resource "aws_iam_role" "ecs_execution_role" {
   name               = "ecs_execution_role"
-  assume_role_policy = data.aws_iam_policy_document.ecs_execution_role_tp
+  assume_role_policy = data.aws_iam_policy_document.ecs_execution_role_tp.json
 }
 
 data "aws_iam_policy" "ecs_execution_policy_managed" {
