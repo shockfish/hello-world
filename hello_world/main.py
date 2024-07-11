@@ -63,7 +63,7 @@ def hello_get(username):
     return jsonify({'message': f'Hello, {username}! Your birthday is in {days_left} day(s)'})
 
 
-@app.route('/health/', methods=['GET'])
+@app.route('/health', methods=['GET'], strict_slashes=False)
 def health():
     """ Method to perform health check with AWS ALB """
     try:

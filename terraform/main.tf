@@ -75,6 +75,7 @@ module "ecr" {
   source = "terraform-aws-modules/ecr/aws"
 
   repository_name = "hello-world"
+  repository_image_tag_mutability = "MUTABLE" # <--- For testing purposes only
   repository_lifecycle_policy = jsonencode({
     rules = [
       {
@@ -128,6 +129,22 @@ module "code-build" {
 
   tags = {
     ManagedBy = "terraform"
+  }
+}
+
+resource "aws_codebuild_webhook" "github_hello_world" {
+  project_name = module.code-build.project_name
+  build_type   = "BUILD"
+  filter_group {
+    filter {
+      type    = "EVENT"
+      pattern = "PUSH"
+    }
+
+    filter {
+      type    = "HEAD_REF"
+      pattern = "refs/heads/main"
+    }
   }
 }
 
@@ -198,8 +215,8 @@ module "alb" {
         enabled             = true
         interval            = 30
         path                = "/health"
-        port                = "traffic-port"
-        healthy_threshold   = 5
+        port                = "5000"
+        healthy_threshold   = 2
         unhealthy_threshold = 3
         timeout             = 5
         protocol            = "HTTP"
