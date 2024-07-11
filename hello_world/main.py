@@ -5,7 +5,7 @@ from flask import jsonify, request
 from util import EndpointNamingError
 from datetime import datetime
 from hello_world import app, db
-from sqlalchemy import exc
+from sqlalchemy import exc, text
 import models
 import re
 
@@ -50,15 +50,28 @@ def hello_get(username):
     # Keep it if we need to fetch more keys from database, e.g. ID or username
     user = dict(re.findall('(\w+): ([\d\w,-]+)', str(result)))
 
-    birth_date = datetime.strptime(user["birth_date"], "%Y-%m-%d")
+    birth_date = datetime.strptime(user["birth_date"], "%Y-%m-%d").replace(year=datetime.today().year).date()
+    today = datetime.today().date()
 
-    delta = (datetime.today() - birth_date).days
-    if delta >= 1:
-        return jsonify('message', f'Hello, {username}! Your birthday is in {delta} day(s)')
-    elif delta == 0:
-        return jsonify('message', f'Hello, {username}! Happy birthday!')
+    if birth_date < today:
+        days_left = (birth_date.replace(year=datetime.today().year + 1) - today).days
+    elif birth_date > today:
+        days_left = (birth_date - today).days
     else:
-        return "Something went wrong", 500
+        return jsonify({'message': f'Hello, {username}! Happy birthday!'})
+
+    return jsonify({'message': f'Hello, {username}! Your birthday is in {days_left} day(s)'})
+
+
+@app.route('/health/', methods=['GET'])
+def health():
+    """ Method to perform health check with AWS ALB """
+    try:
+        db.session.execute(text('SELECT 1'))
+        return jsonify({'ready': True, 'status': 'OK'}), 200
+    except Exception as e:
+        return jsonify({'ready': False, 'status': str(e)}), 500
+
 
 @app.errorhandler(EndpointNamingError)
 def handle_naming_errors(e):
