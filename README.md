@@ -7,6 +7,11 @@ Features:
 - Supports Database migrations
 - Runs in AWS ECS with terraform configuration provided
 
+Deployment design:
+
+[![design](./docs/img/aws-blue-green.png)](./docs/img/aws-blue-green.png)
+<sup>[draw.io source](./docs/img/aws-blue-green.drawio)</sup>
+
 ## Installation
 
 ### Option 0: Running locally without using Docker (for debugging)
@@ -131,10 +136,3 @@ curl http://localhost:5000/hello/vasya
 ```
 
 Only letters allowed in username. If wrong data provided, corresponding code will be returned in response
-
-## TODO / limitations
-
-1. This solution doesn't contain automatic detection of changes in git. Require configure webhooks in CodeBuild
-2. Docker image has always the same tag **latest**. Currently, it's made specially to demonstrate that the ECS works and picks up latest image.
-3. Need to configure CodeDeploy to pick up build provided by CodeBuild and which configures ALB automatically with Blue-Green deployment scheme.
-
