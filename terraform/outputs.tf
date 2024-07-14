@@ -4,5 +4,5 @@ output "database_connection_string" {
 
 output "application_endpoint" {
   description = "Application endpoint with GET and PUT methods accepted"
-  value = "http://${module.alb.dns_name}/hello"
+  value       = "http://${module.alb.dns_name}/hello"
 }

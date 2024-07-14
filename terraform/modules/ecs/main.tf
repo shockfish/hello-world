@@ -22,12 +22,29 @@ data "aws_iam_policy" "ecs_execution_policy_managed" {
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_policy_attachment" {
-  role = aws_iam_role.ecs_execution_role.name
+  role       = aws_iam_role.ecs_execution_role.name
   policy_arn = data.aws_iam_policy.ecs_execution_policy_managed.arn
 }
 
+data "aws_iam_policy_document" "ecs_access_to_secret" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:GetSecretValue"
+    ]
+    resources = [var.postgres_secret_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_access_to_secret" {
+  name   = "ecs_access_to_secret"
+  policy = data.aws_iam_policy_document.ecs_access_to_secret.json
+  role   = aws_iam_role.ecs_execution_role.id
+}
+
 resource "aws_ecs_task_definition" "hello-world" {
-  family                   = "hello-world-web"
+  family                   = var.ecs_task_family
   network_mode             = "awsvpc"
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   requires_compatibilities = ["FARGATE"]
@@ -38,61 +55,21 @@ resource "aws_ecs_task_definition" "hello-world" {
     operating_system_family = "LINUX"
   }
 
-  container_definitions = jsonencode(
-    [
-      {
-        name = "hello-world-web",
-        image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/hello-world:latest",
-        cpu = 0,
-        portMappings = [
-          {
-            name = "hello-world-5000-tcp",
-            containerPort = 5000,
-            hostPort = 5000,
-            protocol = "tcp",
-            appProtocol = "http"
-          }
-        ],
-        essential = true,
-        environment = [
-          {
-            name = "PGHOST",
-            value = var.postgres_host
-          },
-          {
-            name = "PGPORT",
-            value = var.postgres_port
-          },
-          {
-            name = "PGUSER",
-            value = var.postgres_user
-          },
-          {
-            name = "PGDATABASE",
-            value = var.postgres_database
-          },
-          {
-            name = "PGPASSWORD",
-            value = var.postgres_password
-          }
-        ],
-        logConfiguration = {
-          logDriver = "awslogs",
-          options = {
-            awslogs-group = "/ecs/hello-world",
-            awslogs-create-group = "true",
-            awslogs-region = "us-east-1",
-            awslogs-stream-prefix = "ecs"
-          }
-        }
-      }
-    ]
-  )
+  container_definitions = templatefile("${path.root}/templates/taskdef.json.tftpl", {
+    render_container_definition_only = true
+    image                            = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/hello-world:latest"
+    container_name                   = var.ecs_container_name
+    container_port                   = var.ecs_container_port
+    postgres_host                    = var.postgres_host
+    postgres_port                    = var.postgres_port
+    postgres_database                = var.postgres_database
+    postgres_secret_arn              = var.postgres_secret_arn
+    execution_role_arn               = aws_iam_role.ecs_execution_role.arn
+  })
 }
 
 module "ecs_cluster" {
-  source = "terraform-aws-modules/ecs/aws//modules/cluster"
-
+  source       = "terraform-aws-modules/ecs/aws//modules/cluster"
   cluster_name = "ecs-hello-world"
 
   fargate_capacity_providers = {
@@ -104,7 +81,8 @@ module "ecs_cluster" {
   }
 
   tags = {
-    ManagedBy     = "terraform"
+    managedBy = "terraform"
+    app       = "hello-world"
   }
 }
 
@@ -114,9 +92,9 @@ resource "aws_security_group" "ecs_service_sg" {
   vpc_id      = var.ecs_vpc_id
 
   ingress {
-    from_port = 5000
-    to_port = 5000
-    protocol = "tcp"
+    from_port   = var.ecs_container_port
+    to_port     = var.ecs_container_port
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -129,28 +107,35 @@ resource "aws_security_group" "ecs_service_sg" {
 
   tags = {
     managedBy = "terraform"
-    app = "hello-world"
+    app       = "hello-world"
   }
 }
 
 module "ecs_service" {
-  source = "terraform-aws-modules/ecs/aws//modules/service"
-  name = "hello-world-app"
-  cluster_arn = module.ecs_cluster.arn
-  create_task_definition = false
-  task_definition_arn = aws_ecs_task_definition.hello-world.arn
-  family = "hello-world-app"
+  source                   = "terraform-aws-modules/ecs/aws//modules/service"
+  name                     = var.ecs_task_family
+  cluster_arn              = module.ecs_cluster.arn
+  create_task_definition   = false
+  task_definition_arn      = aws_ecs_task_definition.hello-world.arn
+  family                   = var.ecs_task_family
   requires_compatibilities = ["FARGATE"]
-  subnet_ids = var.ecs_subnet_ids
-  assign_public_ip = true
-  desired_count = 1
-  create_security_group = true
-  security_group_ids = [aws_security_group.ecs_service_sg.id]
+  subnet_ids               = var.ecs_subnet_ids
+  assign_public_ip         = true
+  desired_count            = 1
+  create_security_group    = true
+  security_group_ids       = [aws_security_group.ecs_service_sg.id]
+  deployment_controller = {
+    type = "CODE_DEPLOY"
+  }
   load_balancer = {
     service = {
       target_group_arn = var.ecs_alb_target_group_arn
-      container_name   = "hello-world-web"
-      container_port   = 5000
+      container_name   = var.ecs_container_name
+      container_port   = var.ecs_container_port
     }
+  }
+  tags = {
+    managedBy = "terraform"
+    app       = "hello-world"
   }
 }

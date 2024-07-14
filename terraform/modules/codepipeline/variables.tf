@@ -1,13 +1,24 @@
-variable "ecs_subnet_ids" {
-  default = []
+variable "ecr_repository_name" {
+  type    = string
+  default = "hello-world"
 }
 
-variable "ecs_vpc_id" {
+variable "codedeploy_app_name" {
+  type    = string
+  default = "hello-world"
+}
+
+variable "codedeploy_group_name" {
+  type    = string
+  default = "hello-world"
+}
+
+variable "ecs_service_arn" {
   type    = string
   default = ""
 }
 
-variable "ecs_alb_target_group_arn" {
+variable "ecs_task_role_arn" {
   type    = string
   default = ""
 }
@@ -21,12 +32,6 @@ variable "ecs_container_port" {
 variable "ecs_container_name" {
   type        = string
   description = "Container name"
-  default     = "hello-world-web"
-}
-
-variable "ecs_task_family" {
-  type        = string
-  description = "ECS Task family"
   default     = "hello-world-web"
 }
 

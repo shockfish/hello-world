@@ -1,0 +1,81 @@
+%{ if render_container_definition_only }
+    [
+%{ else }
+{
+    "containerDefinitions": [
+%{ endif }
+        {
+            "name": "${container_name}",
+            "image": "${image}",
+            "portMappings": [
+                {
+                    "name": "hello-world-${container_port}-tcp",
+                    "containerPort": ${container_port},
+                    "hostPort": ${container_port},
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "PGHOST",
+                    "value": "${postgres_host}"
+                },
+                {
+                    "name": "PGPORT",
+                    "value": "${postgres_port}"
+                },
+                {
+                    "name": "PGDATABASE",
+                    "value": "${postgres_database}"
+                }
+            ],
+            "secrets": [
+                {
+                    "name": "PGUSER",
+                    "valueFrom": "${postgres_secret_arn}:username::"
+                },
+                {
+                    "name": "PGPASSWORD",
+                    "valueFrom": "${postgres_secret_arn}:password::"
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/hello-world",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            },
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "nc -z 127.0.0.1 ${container_port}"
+                ],
+                "interval": 10,
+                "timeout": 5,
+                "retries": 3,
+                "startPeriod": 5
+            }
+        }
+%{ if render_container_definition_only }
+]
+%{ else }
+    ],
+    "family": "hello-world-web",
+    "executionRoleArn": "${execution_role_arn}",
+    "networkMode": "awsvpc",
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "2048",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    }
+}
+%{ endif }

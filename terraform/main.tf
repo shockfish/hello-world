@@ -20,7 +20,8 @@ module "vpc" {
     }
   ]
   tags = {
-    ManagedBy = "terraform"
+    managedBy = "terraform"
+    app       = "hello-world"
   }
 }
 
@@ -55,9 +56,8 @@ module "rds" {
   db_name  = var.postgres_database
   username = var.postgres_user
   port     = var.postgres_port
-  password = var.postgres_password
 
-  manage_master_user_password = false
+  manage_master_user_password = true
 
   apply_immediately   = true
   deletion_protection = true
@@ -67,14 +67,15 @@ module "rds" {
   db_subnet_group_name   = module.vpc.database_subnet_group_name
 
   tags = {
-    ManagedBy = "terraform"
+    managedBy = "terraform"
+    app       = "hello-world"
   }
 }
 
 module "ecr" {
   source = "terraform-aws-modules/ecr/aws"
 
-  repository_name = "hello-world"
+  repository_name                 = "hello-world"
   repository_image_tag_mutability = "MUTABLE" # <--- For testing purposes only
   repository_lifecycle_policy = jsonencode({
     rules = [
@@ -93,7 +94,8 @@ module "ecr" {
     ]
   })
   tags = {
-    ManagedBy = "terraform"
+    managedBy = "terraform"
+    app       = "hello-world"
   }
 }
 
@@ -128,7 +130,8 @@ module "code-build" {
   EOT
 
   tags = {
-    ManagedBy = "terraform"
+    managedBy = "terraform"
+    app       = "hello-world"
   }
 }
 
@@ -143,22 +146,34 @@ resource "aws_codebuild_webhook" "github_hello_world" {
 
     filter {
       type    = "HEAD_REF"
-      pattern = "refs/heads/main"
+      pattern = "refs/heads/${var.github_repository_branch}"
     }
   }
 }
 
 module "ecs" {
   source = "./modules/ecs"
-
   postgres_host            = module.rds.db_instance_address
   postgres_port            = module.rds.db_instance_port
   postgres_database        = var.postgres_database
-  postgres_password        = var.postgres_password
-  postgres_user            = var.postgres_user
+  postgres_secret_arn      = module.rds.db_instance_master_user_secret_arn
   ecs_subnet_ids           = module.vpc.public_subnets
   ecs_vpc_id               = module.vpc.vpc_id
-  ecs_alb_target_group_arn = module.alb.target_groups["hello_world_app"].arn
+  ecs_alb_target_group_arn = module.alb.target_groups["hello_world_blue"].arn
+}
+
+locals {
+  tg_health_checks = {
+    enabled             = true
+    interval            = 30
+    path                = "/health"
+    port                = var.ecs_container_port
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    protocol            = "HTTP"
+    matcher             = "200"
+  }
 }
 
 module "alb" {
@@ -177,8 +192,8 @@ module "alb" {
       cidr_ipv4   = "0.0.0.0/0"
     }
     allow_5000 = {
-      from_port   = 5000
-      to_port     = 5000
+      from_port   = var.ecs_container_port
+      to_port     = var.ecs_container_port
       ip_protocol = "tcp"
       description = "Service port"
       cidr_ipv4   = "0.0.0.0/0"
@@ -196,32 +211,31 @@ module "alb" {
       port     = 80
       protocol = "HTTP"
       forward = {
-        target_group_key = "hello_world_app"
+        target_group_key = "hello_world_blue"
       }
     }
   }
 
   target_groups = {
-    hello_world_app = {
-      name_prefix = "hw"
+    hello_world_blue = {
+      name        = "hello-blue"
       protocol    = "HTTP"
-      port        = 5000
+      port        = var.ecs_container_port
       target_type = "ip"
       # Configuration requires any valid IP address to be specified
       # before ECS services will be registered in the group
       # In this case we specify dummy IP
-      target_id = "10.0.101.10"
-      health_check = {
-        enabled             = true
-        interval            = 30
-        path                = "/health"
-        port                = "5000"
-        healthy_threshold   = 2
-        unhealthy_threshold = 3
-        timeout             = 5
-        protocol            = "HTTP"
-        matcher             = "200"
-      }
+      target_id    = "10.0.101.10"
+      health_check = local.tg_health_checks
+    }
+
+    hello_world_green = {
+      name         = "hello-green"
+      protocol     = "HTTP"
+      port         = var.ecs_container_port
+      target_type  = "ip"
+      target_id    = "10.0.101.10"
+      health_check = local.tg_health_checks
     }
   }
 
@@ -229,4 +243,23 @@ module "alb" {
     managedBy = "terraform"
     app       = "hello-world"
   }
+}
+
+module "codedeploy" {
+  source                  = "./modules/codedeploy"
+  alb_listener_arns       = module.alb.listeners["default"].arn
+  ecs_cluster_name        = module.ecs.ecs_cluster_name
+  ecs_service_name        = module.ecs.ecs_service_name
+  blue_target_group_name  = module.alb.target_groups["hello_world_blue"].name
+  green_target_group_name = module.alb.target_groups["hello_world_green"].name
+}
+
+module "codepipeline" {
+  source                = "./modules/codepipeline"
+  codedeploy_app_name   = module.codedeploy.codedeploy_app_name
+  codedeploy_group_name = module.codedeploy.codedeploy_group_name
+  ecr_repository_name   = module.ecr.repository_name
+  ecs_service_arn       = module.ecs.ecs_service_arn
+  ecs_task_role_arn     = module.ecs.ecs_task_role_arn
+  postgres_secret_arn   = module.rds.db_instance_master_user_secret_arn
 }

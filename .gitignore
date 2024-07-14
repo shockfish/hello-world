@@ -4,3 +4,4 @@ venv/
 **/.terraform.lock.hcl
 **/terraform.tfstate*
 **/custom.auto.tfvars
+**/**/templates/hello_world.zip

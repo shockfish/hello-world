@@ -1,42 +1,47 @@
 variable "github_personal_token" {
-  type = string
+  type        = string
   description = "GitHub personal access token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
-  default = ""
+  default     = ""
 }
 
 variable "github_repository" {
-  type = string
+  type        = string
   description = "Repository URL contained source code to build"
-  default = "https://github.com/shockfish/hello-world.git"
+  default     = "https://github.com/shockfish/hello-world.git"
 }
 
 variable "github_repository_branch" {
-  type = string
+  type        = string
   description = "Repository branch"
-  default = "main"
+  default     = "main"
 }
 
 variable "postgres_user" {
-  type = string
-  description = "User for RDS postgres instance"
-  default = "sa"
-}
-
-variable "postgres_password" {
-  type = string
-  description = "Password for RDS postgres instance"
-  default = "ChangeME!"
-  sensitive = true
+  type        = string
+  description = "User for RDS postgres instance. Used only once during DB creation. Credentials will be saved to SecretsManager"
+  default     = "sa"
 }
 
 variable "postgres_database" {
-  type = string
+  type        = string
   description = "RDS postgres database name"
-  default = "hello_world"
+  default     = "hello_world"
 }
 
 variable "postgres_port" {
-  type = string
+  type        = string
   description = "RDS postgres port"
-  default = "5432"
+  default     = "5432"
+}
+
+variable "ecs_container_port" {
+  type = number
+  description = "Container exposed port"
+  default = 5000
+}
+
+variable "ecs_container_name" {
+  type = string
+  description = "Container name"
+  default = "hello-world-web"
 }
