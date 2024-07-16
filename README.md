@@ -14,7 +14,7 @@ Deployment design:
 
 ## Installation
 
-### Option 0: Running locally without using Docker (for debugging)
+### Option 1: Running locally without using Docker (for debugging)
 
 Before run, need to adjust database settings.
 
@@ -41,7 +41,7 @@ Run Flask application:
 python hello_world/main.py
 ```
 
-### Option 1: Run application locally using Docker
+### Option 2: Run application locally using Docker
 
 Requirements:
 - docker
@@ -85,6 +85,7 @@ This repository contains Terraform configuration which creates following AWS res
    github_personal_token = "<PERSONAL_ACCESS_TOKEN>"
    ```
 3. If needed, other options, such repository address could be overwritten in `terraform/custom.auto.tfvars` file. This file is ignored by `.gitignore`. For list of all vars check `terraform/variables.tf`
+4. Variable `postgres_user` used only once during initial installation. Password will be generated automatically. Credentials will be saved to AWS Secrets Manager. 
 
 #### Provision infrastructure
 
@@ -106,20 +107,13 @@ terraform apply
 
 All required resources will be created. At the end of installation the URL of the application will be provided.
 
-> **All services created in dedicated VPC, no default resources are used. AWS Free tier compatible.**
+> **All services will be created in dedicated VPC, no default resources are used. AWS Free tier compatible.**
 
-#### Post installation steps
+To see the url of the application, run:
 
-This solution requires one **manual step** at initial stage: is to run `CodeBuild` task manually to produce docker image.
-
-1. Open `AWS Console` -> `CodeBuild`
-2. Navigate `Build projects` page
-2. Select `hello-world-build` project and click `Start build` button
-
-When pipeline is finished, docker image with `:latest` tag will be pushed to ECR and picked up by ECS service called `hello-world-web` automatically. 
-
-After some time try to navigate service url provided by terrafrom output (see Usage below), eg:
-```"http://hello-world-alb-1009320411.us-east-1.elb.amazonaws.com/hello"```
+```
+terraform output
+```
 
 ## Usage
 
